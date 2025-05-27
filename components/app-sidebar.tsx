@@ -1,6 +1,15 @@
-"use client"
+"use client";
 
-import { Home, User, LogIn, UserPlus, LogOut, Users, Moon, Sun } from "lucide-react"
+import {
+  Home,
+  User,
+  LogIn,
+  UserPlus,
+  LogOut,
+  Users,
+  Moon,
+  Sun,
+} from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -12,10 +21,14 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarHeader,
-} from "@/components/ui/sidebar"
-import { Button } from "@/components/ui/button"
-import { useTheme } from "@/components/theme-provider"
-import Link from "next/link"
+} from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
+import { useTheme } from "@/components/theme-provider";
+import Link from "next/link";
+import { useMutation } from "@tanstack/react-query";
+import { logout } from "@/lib/controllers/auth-controller";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/hooks/use-toast";
 
 const menuItems = [
   {
@@ -34,7 +47,7 @@ const menuItems = [
     icon: Users,
     adminOnly: true,
   },
-]
+];
 
 const authItems = [
   {
@@ -47,14 +60,42 @@ const authItems = [
     url: "/signup",
     icon: UserPlus,
   },
-]
+];
 
 export function AppSidebar() {
-  const { theme, setTheme } = useTheme()
+  const { theme, setTheme } = useTheme();
+  const router = useRouter();
+  const { toast } = useToast();
+
+  const logoutMutation = useMutation({
+    mutationKey: ["logout"],
+    mutationFn: async () => {
+      return await logout();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Logout Successful",
+        description: "You have successfully logged out.",
+        variant: "success",
+      });
+      router.push("/login");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Logout Failed",
+        description: "An error occurred while logging out.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleLogout = async () => {
+    await logoutMutation.mutateAsync();
+  };
 
   // Mock user role - replace with actual auth
-  const userRole = "ADMIN" // or "USER"
-  const isAdmin = userRole === "ADMIN"
+  const userRole = "ADMIN"; // or "USER"
+  const isAdmin = userRole === "ADMIN";
 
   return (
     <Sidebar className="border-r border-border transition-colors duration-200">
@@ -67,22 +108,34 @@ export function AppSidebar() {
             onClick={() => setTheme(theme === "light" ? "dark" : "light")}
             className="h-8 w-8 hover:bg-accent transition-colors duration-200"
           >
-            {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+            {theme === "light" ? (
+              <Moon className="h-4 w-4" />
+            ) : (
+              <Sun className="h-4 w-4" />
+            )}
           </Button>
         </div>
       </SidebarHeader>
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="text-muted-foreground text-sm font-medium">Main</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-muted-foreground text-sm font-medium">
+            Main
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems
                 .filter((item) => !item.adminOnly || isAdmin)
                 .map((item) => (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild className="hover:bg-accent transition-colors duration-200">
-                      <Link href={item.url} className="flex items-center gap-3 text-foreground">
+                    <SidebarMenuButton
+                      asChild
+                      className="hover:bg-accent transition-colors duration-200"
+                    >
+                      <Link
+                        href={item.url}
+                        className="flex items-center gap-3 text-foreground"
+                      >
                         <item.icon className="h-4 w-4" />
                         <span>{item.title}</span>
                       </Link>
@@ -94,13 +147,21 @@ export function AppSidebar() {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel className="text-muted-foreground text-sm font-medium">Authentication</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-muted-foreground text-sm font-medium">
+            Authentication
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {authItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild className="hover:bg-accent transition-colors duration-200">
-                    <Link href={item.url} className="flex items-center gap-3 text-foreground">
+                  <SidebarMenuButton
+                    asChild
+                    className="hover:bg-accent transition-colors duration-200"
+                  >
+                    <Link
+                      href={item.url}
+                      className="flex items-center gap-3 text-foreground"
+                    >
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
                     </Link>
@@ -115,7 +176,10 @@ export function AppSidebar() {
       <SidebarFooter className="p-6">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton className="hover:bg-accent transition-colors duration-200 text-red-600 dark:text-red-400">
+            <SidebarMenuButton
+              onClick={handleLogout}
+              className="hover:bg-accent transition-colors duration-200 text-red-600 dark:text-red-400"
+            >
               <LogOut className="h-4 w-4" />
               <span>Sign Out</span>
             </SidebarMenuButton>
@@ -123,5 +187,5 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
-  )
+  );
 }

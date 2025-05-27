@@ -24,19 +24,19 @@ export default class AuthController extends BaseController {
     }
   }
 
-  // async logout(): Promise<{ message: string; status: number }> {
-  //   try {
-  //     const response = await apiClient.post<{
-  //       message: string
-  //       status: number
-  //     }>('/auth/logout')
+  async logout(): Promise<{ message: string; status: number }> {
+    try {
+      const response = await apiClient.post<{
+        message: string
+        status: number
+      }>('/auth/logout')
 
-  //     const data = response.data
-  //     return data
-  //   } catch (error) {
-  //     this.handleError(error)
-  //   }
-  // }
+      const data = response.data
+      return data
+    } catch (error) {
+      this.handleError(error)
+    }
+  }
 
   // async getUserProfile(): Promise<UserData> {
   //   try {
@@ -54,4 +54,4 @@ export default class AuthController extends BaseController {
   // }
 }
 
-export const { login } = new AuthController()
+export const { login, logout } = new AuthController()
