@@ -1,7 +1,10 @@
 import { env } from '@/env'
 import { createSession } from '@/lib/session'
-import { LogInFormSchema } from '@/schemas'
-import type { LoginErrorResponse, LoginSuccessResponse } from '@/types'
+import {
+  LoginErrorResponse,
+  LoginSuccessResponse,
+  LogInFormSchema,
+} from '@/types'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
@@ -14,8 +17,8 @@ export async function POST(request: Request) {
       console.error(error)
       return NextResponse.json<LoginErrorResponse>(
         {
-          status: 'error',
-          message: 'Invalid request body: Expected JSON'
+          message: 'Invalid request body: Expected JSON',
+          error: error instanceof Error ? error.message : 'Unknown error',
         },
         { status: 400 }
       )
@@ -26,9 +29,11 @@ export async function POST(request: Request) {
     if (!validated.success) {
       return NextResponse.json<LoginErrorResponse>(
         {
-          status: 'error',
           message: 'Invalid input data',
-          errors: validated.error.flatten().fieldErrors
+          error: Object.values(validated.error.flatten().fieldErrors)
+            .flat()
+            .filter(Boolean)
+            .join(', ') || 'Invalid input data',
         },
         { status: 400 }
       )
@@ -39,7 +44,7 @@ export async function POST(request: Request) {
     let response
     try {
       response = await fetch(
-        `${env.NEXT_PUBLIC_EXTERNAL_API_URL}/api/auth/login`,
+        `${env.NEXT_PUBLIC_EXTERNAL_API_URL}/api/v1/auth/login`,
         {
           method: 'POST',
           headers: {
@@ -52,8 +57,8 @@ export async function POST(request: Request) {
       console.error('Network error during authentication:', error)
       return NextResponse.json<LoginErrorResponse>(
         {
-          status: 'error',
-          message: 'Failed to connect to authentication service'
+          message: 'Failed to connect to authentication service',
+          error: error instanceof Error ? error.message : 'Unknown network error'
         },
         { status: 503 }
       )
@@ -67,8 +72,8 @@ export async function POST(request: Request) {
         console.error('Error parsing API response:', error)
         return NextResponse.json<LoginErrorResponse>(
           {
-            status: 'error',
-            message: 'Invalid response from authentication service'
+            message: 'Invalid response from authentication service',
+            error: error instanceof Error ? error.message : 'Unknown error'
           },
           { status: response.status }
         )
@@ -77,9 +82,8 @@ export async function POST(request: Request) {
       if (response.status === 401) {
         return NextResponse.json<LoginErrorResponse>(
           {
-            status: 'error',
-            message: responseData.message || 'Invalid credentials',
-            errors: responseData.errors || undefined
+            error: responseData.message || 'Invalid credentials',
+            message: responseData.message || 'Authentication failed',
           },
           { status: 401 }
         )
@@ -87,9 +91,8 @@ export async function POST(request: Request) {
 
       return NextResponse.json<LoginErrorResponse>(
         {
-          status: 'error',
           message: responseData.message || 'Authentication failed',
-          errors: responseData.errors || undefined
+          error: responseData.error || undefined
         },
         { status: response.status }
       )
@@ -102,17 +105,17 @@ export async function POST(request: Request) {
       console.error('Error parsing success response:', error)
       return NextResponse.json<LoginErrorResponse>(
         {
-          status: 'error',
-          message: 'Malformed response from authentication service'
+          message: 'Malformed response from authentication service',
+          error: error instanceof Error ? error.message : 'Unknown error',
         },
         { status: 500 }
       )
     }
 
-    if (!successData.data?.token) {
+    if (!successData?.access_token) {
       return NextResponse.json<LoginErrorResponse>(
         {
-          status: 'error',
+          error: 'No authentication token provided by server',
           message: 'No authentication token provided by server'
         },
         { status: 500 }
@@ -120,12 +123,12 @@ export async function POST(request: Request) {
     }
 
     try {
-      await createSession(successData.data.token)
+      await createSession(successData.access_token)
     } catch (error) {
       console.error('Session creation error:', error)
       return NextResponse.json<LoginErrorResponse>(
         {
-          status: 'error',
+          error: 'Failed to create session',
           message: 'Failed to create session'
         },
         { status: 500 }
@@ -134,9 +137,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json<LoginSuccessResponse>(
       {
-        status: 'success',
-        message: 'Login successful',
-        data: successData.data
+
+        id: successData.id,
+        email: successData.email,
       },
       { status: 200 }
     )
@@ -144,7 +147,7 @@ export async function POST(request: Request) {
     console.error('Unexpected login error:', error)
     return NextResponse.json<LoginErrorResponse>(
       {
-        status: 'error',
+        error: 'Unexpected error occurred',
         message:
           error instanceof Error
             ? error.message

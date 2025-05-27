@@ -1,4 +1,4 @@
-import ApiError from '@/lib/api/handlers/api-error'
+import ApiError from '@/lib/handlers/api-error'
 
 
 export default class BaseController {
