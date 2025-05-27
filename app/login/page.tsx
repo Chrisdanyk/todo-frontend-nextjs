@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { use, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,25 +15,25 @@ import {
 } from "@/components/ui/card";
 import { useTheme } from "@/components/theme-provider";
 import { useToast } from "@/hooks/use-toast";
-import { Moon, Sun } from "lucide-react";
+import { Loader, Moon, Sun } from "lucide-react";
 import Link from "next/link";
 import { login } from "@/lib/controllers/auth-controller";
 import { useRouter } from "next/navigation";
+import { useMutation } from "@tanstack/react-query";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
   const router = useRouter();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    try {
+  const loginMutation = useMutation({
+    mutationKey: ["login"],
+    mutationFn: async () => {
       await login({ email, password });
+    },
+    onSuccess: () => {
       toast({
         title: "Login Successful",
         description: "You have successfully logged in.",
@@ -41,16 +41,20 @@ export default function LoginPage() {
       });
       // Redirect to the home page or dashboard after successful login
       router.push("/");
-    } catch (error) {
+    },
+    onError: (error: any) => {
       console.error("Login failed:", error);
       toast({
         title: "Login Failed",
         description: "Please check your email and password and try again.",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
-    }
+    },
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    return await loginMutation.mutateAsync();
   };
 
   return (
@@ -99,7 +103,7 @@ export default function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   className="border-border focus:border-ring focus:ring-ring transition-colors duration-200"
                   required
-                  disabled={isLoading}
+                  disabled={loginMutation.isPending}
                 />
               </div>
               <div className="space-y-2">
@@ -117,15 +121,19 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   className="border-border focus:border-ring focus:ring-ring transition-colors duration-200"
                   required
-                  disabled={isLoading}
+                  disabled={loginMutation.isPending}
                 />
               </div>
               <Button
                 type="submit"
-                disabled={isLoading}
+                disabled={loginMutation.isPending}
                 className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:hover:scale-100"
               >
-                {isLoading ? "Signing in..." : "Sign In"}
+                {loginMutation.isPending ? (
+                  <Loader className="animate-spin size-5" />
+                ) : (
+                  "Sign In"
+                )}
               </Button>
             </form>
 
