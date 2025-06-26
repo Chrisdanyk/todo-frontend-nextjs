@@ -1,33 +1,51 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { Badge } from "@/components/ui/badge"
-import { Shield, LucideUser } from "lucide-react"
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { User as UserType } from "@/lib/auth";
 
-type User = {
-  id: string
-  name: string
-  email: string
-  role: "ADMIN" | "USER"
-  createdAt: Date
-  updatedAt: Date
-  totalTodos: number
-  completedTodos: number
-}
+type SheetAction = "view" | "edit" | "delete" | "add" | null;
 
-type UserManagementSheetProps = {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  action: "view" | "edit" | "delete" | "add" | null
-  user: User | null
-  onDelete: (userId: string) => void
-  onUpdate: (userId: string, name: string, email: string, role: "ADMIN" | "USER") => void
-  onAdd: (name: string, email: string, role: "ADMIN" | "USER") => void
+interface UserManagementSheetProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  action: SheetAction;
+  user: UserType | null;
+  onDelete: (userId: string) => void;
+  onUpdate: (
+    userId: string,
+    name: string,
+    email: string,
+    role: "ADMIN" | "USER"
+  ) => void;
+  onAdd: (name: string, email: string, role: "ADMIN" | "USER") => void;
 }
 
 export function UserManagementSheet({
@@ -39,235 +57,203 @@ export function UserManagementSheet({
   onUpdate,
   onAdd,
 }: UserManagementSheetProps) {
-  const [editName, setEditName] = useState("")
-  const [editEmail, setEditEmail] = useState("")
-  const [editRole, setEditRole] = useState<"ADMIN" | "USER">("USER")
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<"ADMIN" | "USER">("USER");
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   useEffect(() => {
     if (user && (action === "edit" || action === "view")) {
-      setEditName(user.name)
-      setEditEmail(user.email)
-      setEditRole(user.role)
+      setName(user.name || "");
+      setEmail(user.email);
+      setRole(user.role);
     } else if (action === "add") {
-      setEditName("")
-      setEditEmail("")
-      setEditRole("USER")
+      setName("");
+      setEmail("");
+      setRole("USER");
     }
-  }, [user, action])
+  }, [user, action]);
 
-  if (!action) return null
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
 
-  const handleSubmit = () => {
-    if (!editName.trim() || !editEmail.trim()) return
-
-    if (action === "add") {
-      onAdd(editName.trim(), editEmail.trim(), editRole)
-    } else if (action === "edit" && user) {
-      onUpdate(user.id, editName.trim(), editEmail.trim(), editRole)
+    if (action === "edit" && user) {
+      onUpdate(user.id, name, email, role);
+    } else if (action === "add") {
+      onAdd(name, email, role);
     }
-  }
+  };
 
   const handleDelete = () => {
     if (user) {
-      onDelete(user.id)
+      onDelete(user.id);
+      setShowDeleteDialog(false);
     }
-  }
+  };
 
-  const getSheetTitle = () => {
+  const getTitle = () => {
     switch (action) {
       case "view":
-        return "View User"
+        return "View User";
       case "edit":
-        return "Edit User"
+        return "Edit User";
       case "delete":
-        return "Delete User"
+        return "Delete User";
       case "add":
-        return "Add New User"
+        return "Add User";
       default:
-        return "User"
+        return "";
     }
-  }
+  };
 
-  const getSheetDescription = () => {
+  const getDescription = () => {
     switch (action) {
       case "view":
-        return "View user details and information"
+        return "View user details and information";
       case "edit":
-        return "Make changes to user information"
+        return "Update user information and permissions";
       case "delete":
-        return "This action cannot be undone"
+        return "Permanently delete this user from the system";
       case "add":
-        return "Create a new user account"
+        return "Create a new user account";
       default:
-        return ""
+        return "";
     }
+  };
+
+  if (action === "delete") {
+    return (
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the
+              user{" "}
+              <span className="font-semibold">{user?.name || user?.email}</span>{" "}
+              and remove their data from our servers.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    );
   }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="bg-background border-l border-border transition-colors duration-200">
+      <SheetContent className="w-full sm:max-w-md">
         <SheetHeader>
-          <SheetTitle className="text-foreground">{getSheetTitle()}</SheetTitle>
-          <SheetDescription className="text-muted-foreground">{getSheetDescription()}</SheetDescription>
+          <SheetTitle>{getTitle()}</SheetTitle>
+          <SheetDescription>{getDescription()}</SheetDescription>
         </SheetHeader>
 
-        <div className="py-6 space-y-6">
-          {action === "view" && user && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div
-                  className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-semibold ${
-                    user.role === "ADMIN" ? "bg-blue-500" : "bg-green-500"
-                  }`}
+        <div className="mt-6">
+          {action === "view" && user ? (
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-muted-foreground">
+                  Name
+                </Label>
+                <p className="text-foreground">
+                  {user.name || "No name provided"}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-muted-foreground">
+                  Email
+                </Label>
+                <p className="text-foreground">{user.email}</p>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-muted-foreground">
+                  Role
+                </Label>
+                <Badge
+                  variant={user.role === "ADMIN" ? "default" : "secondary"}
                 >
-                  {user.role === "ADMIN" ? <Shield className="h-6 w-6" /> : <LucideUser className="h-6 w-6" />}
-                </div>
-                <div>
-                  <div className="font-semibold text-foreground">{user.name}</div>
-                  <div className="text-sm text-muted-foreground">{user.email}</div>
-                </div>
+                  {user.role}
+                </Badge>
               </div>
-
-              <div>
-                <Label className="text-foreground font-medium">Role</Label>
-                <div className="mt-1">
-                  <Badge
-                    variant={user.role === "ADMIN" ? "default" : "secondary"}
-                    className={
-                      user.role === "ADMIN"
-                        ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100"
-                        : "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
-                    }
-                  >
-                    {user.role}
-                  </Badge>
-                </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-muted-foreground">
+                  Created
+                </Label>
+                <p className="text-foreground">
+                  {new Date(user.createdAt).toLocaleDateString()}
+                </p>
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-foreground font-medium">Total Todos</Label>
-                  <div className="mt-1 text-2xl font-semibold text-foreground">{user.totalTodos}</div>
-                </div>
-                <div>
-                  <Label className="text-foreground font-medium">Completed</Label>
-                  <div className="mt-1 text-2xl font-semibold text-green-600 dark:text-green-400">
-                    {user.completedTodos}
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <Label className="text-foreground font-medium">Member Since</Label>
-                <div className="mt-1 text-muted-foreground">
-                  {user.createdAt.toLocaleDateString()} at {user.createdAt.toLocaleTimeString()}
-                </div>
-              </div>
-
-              <div>
-                <Label className="text-foreground font-medium">Last Updated</Label>
-                <div className="mt-1 text-muted-foreground">
-                  {user.updatedAt.toLocaleDateString()} at {user.updatedAt.toLocaleTimeString()}
-                </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-muted-foreground">
+                  Last Updated
+                </Label>
+                <p className="text-foreground">
+                  {new Date(user.updatedAt).toLocaleDateString()}
+                </p>
               </div>
             </div>
-          )}
-
-          {(action === "edit" || action === "add") && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="user-name" className="text-foreground font-medium">
-                  Name *
-                </Label>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Name</Label>
                 <Input
-                  id="user-name"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  className="mt-1 border-border focus:border-ring focus:ring-ring transition-colors duration-200"
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   placeholder="Enter user name"
+                  required
                 />
               </div>
-
-              <div>
-                <Label htmlFor="user-email" className="text-foreground font-medium">
-                  Email *
-                </Label>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
                 <Input
-                  id="user-email"
+                  id="email"
                   type="email"
-                  value={editEmail}
-                  onChange={(e) => setEditEmail(e.target.value)}
-                  className="mt-1 border-border focus:border-ring focus:ring-ring transition-colors duration-200"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter user email"
+                  required
                 />
               </div>
-
-              <div>
-                <Label htmlFor="user-role" className="text-foreground font-medium">
-                  Role *
-                </Label>
-                <Select value={editRole} onValueChange={(value: "ADMIN" | "USER") => setEditRole(value)}>
-                  <SelectTrigger className="mt-1 border-border focus:border-ring focus:ring-ring transition-colors duration-200">
+              <div className="space-y-2">
+                <Label htmlFor="role">Role</Label>
+                <Select
+                  value={role}
+                  onValueChange={(value: "ADMIN" | "USER") => setRole(value)}
+                >
+                  <SelectTrigger>
                     <SelectValue placeholder="Select role" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="USER">User</SelectItem>
-                    <SelectItem value="ADMIN">Administrator</SelectItem>
+                    <SelectItem value="ADMIN">Admin</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-
-              {action === "add" && (
-                <div className="p-4 bg-muted rounded-md">
-                  <div className="text-sm text-muted-foreground">
-                    <strong>Note:</strong> The user will need to set their password on first login.
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {action === "delete" && user && (
-            <div className="space-y-4">
-              <div className="p-4 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-md">
-                <div className="text-red-800 dark:text-red-200 font-medium">Are you sure?</div>
-                <div className="text-red-600 dark:text-red-400 text-sm mt-1">
-                  This will permanently delete the user "{user.name}" and all their data. This action cannot be undone.
-                </div>
+              <div className="flex gap-2 pt-4">
+                <Button type="submit" className="flex-1">
+                  {action === "edit" ? "Update User" : "Create User"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                >
+                  Cancel
+                </Button>
               </div>
-            </div>
+            </form>
           )}
         </div>
-
-        <SheetFooter className="gap-2">
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            className="border-border text-foreground hover:bg-accent transition-colors duration-200"
-          >
-            Cancel
-          </Button>
-
-          {(action === "edit" || action === "add") && (
-            <Button
-              onClick={handleSubmit}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground transition-colors duration-200"
-              disabled={!editName.trim() || !editEmail.trim()}
-            >
-              {action === "add" ? "Add User" : "Save Changes"}
-            </Button>
-          )}
-
-          {action === "delete" && (
-            <Button
-              onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700 text-white transition-colors duration-200"
-            >
-              Delete User
-            </Button>
-          )}
-        </SheetFooter>
       </SheetContent>
     </Sheet>
-  )
+  );
 }

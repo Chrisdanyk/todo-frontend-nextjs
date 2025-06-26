@@ -1,148 +1,169 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { SidebarTrigger } from "@/components/ui/sidebar"
-import { Eye, Edit, Trash2, UserPlus, Shield, User } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
-import { UserManagementSheet } from "@/components/user-management-sheet"
-import { useToast } from "@/hooks/use-toast"
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { Eye, Edit, Trash2, UserPlus, Shield, User } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { UserManagementSheet } from "@/components/user-management-sheet";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/auth-context";
+import { ProtectedRoute } from "@/components/protected-route";
+import { authAPI, User as UserType } from "@/lib/auth";
 
-// Mock users data
-const mockUsers = [
-  {
-    id: "1",
-    name: "John Doe",
-    email: "john.doe@example.com",
-    role: "ADMIN" as const,
-    createdAt: new Date("2024-01-15"),
-    updatedAt: new Date("2024-01-20"),
-    totalTodos: 12,
-    completedTodos: 8,
-  },
-  {
-    id: "2",
-    name: "Jane Smith",
-    email: "jane.smith@example.com",
-    role: "USER" as const,
-    createdAt: new Date("2024-02-01"),
-    updatedAt: new Date("2024-02-05"),
-    totalTodos: 5,
-    completedTodos: 3,
-  },
-  {
-    id: "3",
-    name: "Bob Johnson",
-    email: "bob.johnson@example.com",
-    role: "USER" as const,
-    createdAt: new Date("2024-02-10"),
-    updatedAt: new Date("2024-02-15"),
-    totalTodos: 8,
-    completedTodos: 6,
-  },
-  {
-    id: "4",
-    name: "Alice Brown",
-    email: "alice.brown@example.com",
-    role: "USER" as const,
-    createdAt: new Date("2024-02-20"),
-    updatedAt: new Date("2024-02-25"),
-    totalTodos: 15,
-    completedTodos: 10,
-  },
-]
-
-type UserType = {
-  id: string
-  name: string
-  email: string
-  role: "ADMIN" | "USER"
-  createdAt: Date
-  updatedAt: Date
-  totalTodos: number
-  completedTodos: number
-}
-
-type SheetAction = "view" | "edit" | "delete" | "add" | null
+type SheetAction = "view" | "edit" | "delete" | "add" | null;
 
 export default function UserManagementPage() {
-  const [users, setUsers] = useState<UserType[]>(mockUsers)
-  const [sheetOpen, setSheetOpen] = useState(false)
-  const [sheetAction, setSheetAction] = useState<SheetAction>(null)
-  const [selectedUser, setSelectedUser] = useState<UserType | null>(null)
-  const { toast } = useToast()
+  const [users, setUsers] = useState<UserType[]>([]);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetAction, setSheetAction] = useState<SheetAction>(null);
+  const [selectedUser, setSelectedUser] = useState<UserType | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
+  const { user: currentUser } = useAuth();
 
-  // Check if current user is admin (mock)
-  const currentUserRole = "ADMIN"
-  const isAdmin = currentUserRole === "ADMIN"
+  // Check if current user is admin
+  const isAdmin = currentUser?.role === "ADMIN";
+
+  useEffect(() => {
+    if (isAdmin) {
+      loadUsers();
+    }
+  }, [isAdmin]);
+
+  const loadUsers = async () => {
+    try {
+      setIsLoading(true);
+      const response = await authAPI.listUsers();
+      setUsers(response.data || []);
+    } catch (error) {
+      console.error("Failed to load users:", error);
+      toast({
+        variant: "destructive",
+        title: "Failed to load users",
+        description: "Unable to fetch user data. Please try again.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   if (!isAdmin) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card className="w-full max-w-md border-border">
-          <CardHeader className="text-center">
-            <CardTitle className="text-foreground">Access Denied</CardTitle>
-            <CardDescription className="text-muted-foreground">
-              You don't have permission to access this page
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
-    )
+      <ProtectedRoute requireAdmin>
+        <div></div>
+      </ProtectedRoute>
+    );
   }
 
-  const adminCount = users.filter((user) => user.role === "ADMIN").length
-  const userCount = users.filter((user) => user.role === "USER").length
+  const adminCount = users.filter((user) => user.role === "ADMIN").length;
+  const userCount = users.filter((user) => user.role === "USER").length;
 
   const handleAction = (action: SheetAction, user?: UserType) => {
-    setSheetAction(action)
-    setSelectedUser(user || null)
-    setSheetOpen(true)
-  }
+    setSheetAction(action);
+    setSelectedUser(user || null);
+    setSheetOpen(true);
+  };
 
-  const handleDeleteUser = (userId: string) => {
-    const user = users.find((u) => u.id === userId)
-    setUsers(users.filter((user) => user.id !== userId))
-    setSheetOpen(false)
+  const handleDeleteUser = async (userId: string) => {
+    try {
+      const user = users.find((u) => u.id === userId);
+      await authAPI.deleteUser(userId);
+      setUsers(users.filter((user) => user.id !== userId));
+      setSheetOpen(false);
 
-    toast({
-      variant: "destructive",
-      title: "User deleted",
-      description: `"${user?.name}" has been permanently deleted from the system.`,
-    })
-  }
-
-  const handleUpdateUser = (userId: string, name: string, email: string, role: "ADMIN" | "USER") => {
-    setUsers(users.map((user) => (user.id === userId ? { ...user, name, email, role, updatedAt: new Date() } : user)))
-    setSheetOpen(false)
-
-    toast({
-      variant: "success",
-      title: "User updated",
-      description: "User information has been successfully updated.",
-    })
-  }
-
-  const handleAddUser = (name: string, email: string, role: "ADMIN" | "USER") => {
-    const newUser: UserType = {
-      id: Date.now().toString(),
-      name,
-      email,
-      role,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      totalTodos: 0,
-      completedTodos: 0,
+      toast({
+        variant: "destructive",
+        title: "User deleted",
+        description: `"${
+          user?.name || user?.email
+        }" has been permanently deleted from the system.`,
+      });
+    } catch (error) {
+      console.error("Failed to delete user:", error);
+      toast({
+        variant: "destructive",
+        title: "Delete failed",
+        description: "Failed to delete user. Please try again.",
+      });
     }
-    setUsers([...users, newUser])
-    setSheetOpen(false)
+  };
 
-    toast({
-      variant: "success",
-      title: "User created",
-      description: `"${name}" has been successfully added to the system.`,
-    })
+  const handleUpdateUser = async (
+    userId: string,
+    name: string,
+    email: string,
+    role: "ADMIN" | "USER"
+  ) => {
+    try {
+      const updatedUser = await authAPI.updateUser(userId, {
+        name,
+        email,
+        role,
+      });
+      setUsers(users.map((user) => (user.id === userId ? updatedUser : user)));
+      setSheetOpen(false);
+
+      toast({
+        variant: "success",
+        title: "User updated",
+        description: "User information has been successfully updated.",
+      });
+    } catch (error) {
+      console.error("Failed to update user:", error);
+      toast({
+        variant: "destructive",
+        title: "Update failed",
+        description: "Failed to update user. Please try again.",
+      });
+    }
+  };
+
+  const handleAddUser = async (
+    name: string,
+    email: string,
+    role: "ADMIN" | "USER"
+  ) => {
+    try {
+      // Note: The backend doesn't have a direct create user endpoint for admins
+      // This would need to be implemented in the backend
+      toast({
+        variant: "destructive",
+        title: "Not implemented",
+        description:
+          "User creation by admin is not yet implemented in the backend.",
+      });
+      setSheetOpen(false);
+    } catch (error) {
+      console.error("Failed to create user:", error);
+      toast({
+        variant: "destructive",
+        title: "Create failed",
+        description: "Failed to create user. Please try again.",
+      });
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="w-full max-w-md border-border">
+          <CardContent className="flex items-center justify-center p-8">
+            <div className="flex items-center gap-2">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+              <span className="text-muted-foreground">Loading users...</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
@@ -168,28 +189,40 @@ export default function UserManagementPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-8">
           <Card className="border-border transition-all duration-200 hover:shadow-md animate-in fade-in-0 slide-in-from-bottom-5 duration-500 delay-100">
             <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-medium text-foreground">Total Users</CardTitle>
+              <CardTitle className="text-lg font-medium text-foreground">
+                Total Users
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl md:text-3xl font-semibold text-foreground">{users.length}</div>
+              <div className="text-2xl md:text-3xl font-semibold text-foreground">
+                {users.length}
+              </div>
             </CardContent>
           </Card>
 
           <Card className="border-border transition-all duration-200 hover:shadow-md animate-in fade-in-0 slide-in-from-bottom-5 duration-500 delay-200">
             <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-medium text-foreground">Administrators</CardTitle>
+              <CardTitle className="text-lg font-medium text-foreground">
+                Administrators
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl md:text-3xl font-semibold text-blue-600 dark:text-blue-400">{adminCount}</div>
+              <div className="text-2xl md:text-3xl font-semibold text-blue-600 dark:text-blue-400">
+                {adminCount}
+              </div>
             </CardContent>
           </Card>
 
           <Card className="border-border transition-all duration-200 hover:shadow-md animate-in fade-in-0 slide-in-from-bottom-5 duration-500 delay-300">
             <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-medium text-foreground">Regular Users</CardTitle>
+              <CardTitle className="text-lg font-medium text-foreground">
+                Regular Users
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl md:text-3xl font-semibold text-green-600 dark:text-green-400">{userCount}</div>
+              <div className="text-2xl md:text-3xl font-semibold text-green-600 dark:text-green-400">
+                {userCount}
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -197,81 +230,78 @@ export default function UserManagementPage() {
         {/* Users List */}
         <Card className="border-border transition-colors duration-200 animate-in fade-in-0 slide-in-from-bottom-5 duration-500 delay-400">
           <CardHeader>
-            <CardTitle className="text-xl font-semibold text-foreground">Users</CardTitle>
-            <CardDescription className="text-muted-foreground">Manage user accounts and permissions</CardDescription>
+            <CardTitle className="text-xl font-semibold text-foreground">
+              Users
+            </CardTitle>
+            <CardDescription className="text-muted-foreground">
+              Manage user accounts and permissions
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {users.map((user, index) => (
+            <div className="space-y-4">
+              {users.map((user) => (
                 <div
                   key={user.id}
-                  className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-accent/50 transition-all duration-200 group animate-in fade-in-0 slide-in-from-left-5"
-                  style={{ animationDelay: `${index * 50}ms` }}
+                  className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-accent/50 transition-colors duration-200"
                 >
-                  <div className="flex items-center gap-4 flex-1 min-w-0">
-                    <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold ${
-                        user.role === "ADMIN" ? "bg-blue-500" : "bg-green-500"
-                      }`}
-                    >
-                      {user.role === "ADMIN" ? <Shield className="h-5 w-5" /> : <User className="h-5 w-5" />}
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center justify-center w-10 h-10 bg-primary/10 rounded-full">
+                      {user.role === "ADMIN" ? (
+                        <Shield className="h-5 w-5 text-primary" />
+                      ) : (
+                        <User className="h-5 w-5 text-muted-foreground" />
+                      )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-foreground truncate">{user.name}</span>
+                    <div>
+                      <h3 className="font-medium text-foreground">
+                        {user.name || "No name"}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {user.email}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
                         <Badge
-                          variant={user.role === "ADMIN" ? "default" : "secondary"}
-                          className={
-                            user.role === "ADMIN"
-                              ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100"
-                              : "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
+                          variant={
+                            user.role === "ADMIN" ? "default" : "secondary"
                           }
+                          className="text-xs"
                         >
                           {user.role}
                         </Badge>
-                      </div>
-                      <div className="text-sm text-muted-foreground truncate">{user.email}</div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {user.completedTodos}/{user.totalTodos} todos completed
+                        <span className="text-xs text-muted-foreground">
+                          Joined {new Date(user.createdAt).toLocaleDateString()}
+                        </span>
                       </div>
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  <div className="flex items-center gap-2">
                     <Button
                       variant="ghost"
-                      size="sm"
+                      size="icon"
                       onClick={() => handleAction("view", user)}
-                      className="h-8 w-8 p-0 hover:bg-accent transition-colors duration-200"
+                      className="h-8 w-8 hover:bg-accent"
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="ghost"
-                      size="sm"
+                      size="icon"
                       onClick={() => handleAction("edit", user)}
-                      className="h-8 w-8 p-0 hover:bg-accent transition-colors duration-200"
+                      className="h-8 w-8 hover:bg-accent"
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="ghost"
-                      size="sm"
+                      size="icon"
                       onClick={() => handleAction("delete", user)}
-                      className="h-8 w-8 p-0 hover:bg-red-50 dark:hover:bg-red-950 text-red-600 dark:text-red-400 transition-colors duration-200"
+                      className="h-8 w-8 hover:bg-accent text-red-600 dark:text-red-400"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
               ))}
-
-              {users.length === 0 && (
-                <div className="text-center py-12 animate-in fade-in-0 duration-500">
-                  <div className="text-muted-foreground mb-2">No users found</div>
-                  <div className="text-sm text-muted-foreground">Add your first user to get started</div>
-                </div>
-              )}
             </div>
           </CardContent>
         </Card>
@@ -287,5 +317,5 @@ export default function UserManagementPage() {
         onAdd={handleAddUser}
       />
     </div>
-  )
+  );
 }
