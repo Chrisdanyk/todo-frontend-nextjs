@@ -45,13 +45,21 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isMounted, setIsMounted] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
 
   const isAuthenticated = !!user;
 
+  // Set mounted state to prevent hydration issues
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   // Initialize auth state on mount
   useEffect(() => {
+    if (!isMounted) return;
+
     const initializeAuth = async () => {
       try {
         if (authAPI.isAuthenticated()) {
@@ -85,7 +93,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
 
     initializeAuth();
-  }, [router]);
+  }, [router, isMounted]);
 
   const login = async (credentials: LoginCredentials) => {
     try {
@@ -220,7 +228,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const value: AuthContextType = {
     user,
-    isLoading,
+    isLoading: isLoading || !isMounted,
     isAuthenticated,
     login,
     signup,
