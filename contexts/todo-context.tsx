@@ -182,6 +182,9 @@ export function TodoProvider({ children }: TodoProviderProps) {
       const newTodo = await todoAPI.createTodo(data);
       setTodos((prev) => [newTodo, ...prev]);
 
+      // Refresh stats to show real-time updates
+      await refreshStats();
+
       toast({
         variant: "success",
         title: "Todo created",
@@ -210,6 +213,9 @@ export function TodoProvider({ children }: TodoProviderProps) {
         prev.map((todo) => (todo.id === id ? updatedTodo : todo))
       );
 
+      // Refresh stats to show real-time updates
+      await refreshStats();
+
       toast({
         variant: "success",
         title: "Todo updated",
@@ -233,6 +239,9 @@ export function TodoProvider({ children }: TodoProviderProps) {
     try {
       await todoAPI.deleteTodo(id);
       setTodos((prev) => prev.filter((todo) => todo.id !== id));
+
+      // Refresh stats to show real-time updates
+      await refreshStats();
 
       toast({
         variant: "default",
@@ -259,6 +268,9 @@ export function TodoProvider({ children }: TodoProviderProps) {
       setTodos((prev) =>
         prev.map((todo) => (todo.id === id ? updatedTodo : todo))
       );
+
+      // Refresh stats to show real-time updates
+      await refreshStats();
     } catch (error) {
       console.error("Failed to toggle todo:", error);
       toast({
@@ -388,6 +400,9 @@ export function TodoProvider({ children }: TodoProviderProps) {
           order: index,
         }));
       });
+
+      // Refresh stats to show real-time updates
+      await refreshStats();
 
       toast({
         variant: "success",
