@@ -62,9 +62,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
           }
 
           // Fetch fresh user data
-          const currentUser = await authAPI.getCurrentUser();
-          setUser(currentUser);
-          authAPI.setStoredUser(currentUser);
+          try {
+            const currentUser = await authAPI.getCurrentUser();
+            setUser(currentUser);
+            authAPI.setStoredUser(currentUser);
+          } catch (error) {
+            console.error("Failed to fetch current user:", error);
+            // If fetching user fails, clear everything and redirect to login
+            authAPI.clearStoredUser();
+            await authAPI.logout();
+            router.push("/login");
+          }
         }
       } catch (error) {
         console.error("Auth initialization error:", error);
@@ -77,7 +85,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
 
     initializeAuth();
-  }, []);
+  }, [router]);
 
   const login = async (credentials: LoginCredentials) => {
     try {
@@ -206,6 +214,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(null);
       authAPI.clearStoredUser();
       await authAPI.logout();
+      router.push("/login");
     }
   };
 

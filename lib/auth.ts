@@ -33,6 +33,8 @@ export interface UpdateUserData {
 
 class AuthAPI {
   private baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+  private isRefreshing = false;
+  private refreshPromise: Promise<AuthResponse> | null = null;
 
   private async request<T>(
     endpoint: string,
@@ -57,14 +59,52 @@ class AuthAPI {
       };
     }
 
-    const response = await fetch(url, config);
+    try {
+      const response = await fetch(url, config);
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      if (response.status === 401) {
+        // Token expired, try to refresh
+        if (endpoint !== '/refresh' && this.getRefreshToken()) {
+          try {
+            await this.refreshToken();
+            // Retry the original request with new token
+            const newToken = this.getAccessToken();
+            if (newToken) {
+              config.headers = {
+                ...config.headers,
+                Authorization: `Bearer ${newToken}`,
+              };
+              const retryResponse = await fetch(url, config);
+              if (!retryResponse.ok) {
+                const errorData = await retryResponse.json().catch(() => ({}));
+                throw new Error(errorData.message || `HTTP error! status: ${retryResponse.status}`);
+              }
+              return retryResponse.json();
+            }
+          } catch (refreshError) {
+            // Refresh failed, clear tokens and throw error
+            this.clearTokens();
+            this.clearStoredUser();
+            throw new Error('Authentication expired. Please log in again.');
+          }
+        }
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      return response.json();
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('Authentication expired')) {
+        // Redirect to login for expired authentication
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
+      }
+      throw error;
     }
-
-    return response.json();
   }
 
   // Token management
@@ -121,21 +161,49 @@ class AuthAPI {
       }
     }
     this.clearTokens();
+    this.clearStoredUser();
   }
 
   async refreshToken(): Promise<AuthResponse> {
+    // Prevent multiple simultaneous refresh attempts
+    if (this.isRefreshing && this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    this.isRefreshing = true;
+    this.refreshPromise = this.performRefresh();
+
+    try {
+      const result = await this.refreshPromise;
+      return result;
+    } finally {
+      this.isRefreshing = false;
+      this.refreshPromise = null;
+    }
+  }
+
+  private async performRefresh(): Promise<AuthResponse> {
     const refreshToken = this.getRefreshToken();
     if (!refreshToken) {
       throw new Error('No refresh token available');
     }
 
-    const response = await this.request<AuthResponse>('/refresh', {
+    const response = await fetch(`${this.baseURL}/api/v1/auth/refresh`, {
       method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({ refresh_token: refreshToken }),
     });
 
-    this.setTokens(response.access_token, response.refresh_token);
-    return response;
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to refresh token');
+    }
+
+    const authResponse = await response.json();
+    this.setTokens(authResponse.access_token, authResponse.refresh_token);
+    return authResponse;
   }
 
   async getCurrentUser(): Promise<User> {
